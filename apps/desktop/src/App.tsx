@@ -154,7 +154,7 @@ export default function App() {
         <div className="brand">
           <div className="brand__mark" aria-hidden />
           <h1 className="brand__title">Sync</h1>
-          <div className="brand__version">Version 0.1.0</div>
+          <div className="brand__version">Version 0.1.1</div>
         </div>
         <nav className="nav">
           <button
