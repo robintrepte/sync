@@ -4,7 +4,10 @@
   "version": "0.1.0",
   "identifier": "com.robin.lan-input-sync",
   "build": {
-    "beforeDevCommand": "npm run dev --prefix ..",
+    "beforeDevCommand": {
+      "script": "npm run dev",
+      "cwd": ".."
+    },
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5173"
   },

@@ -1,5 +1,16 @@
 # Troubleshooting
 
+## `tauri dev` / `beforeDevCommand` cannot find `package.json` (ENOENT under `apps/`)
+
+The dev server must run Vite from **`apps/desktop`**, not from `apps/`. This repo sets `beforeDevCommand` in `tauri.conf.json` with an explicit `cwd: ".."` (parent of `src-tauri` = `apps/desktop`) so `npm run dev` finds the right `package.json`.
+
+From the **repo root**, use:
+
+```bash
+npm install
+npm run tauri:dev -w apps/desktop
+```
+
 ## Rust compile fails with rustc toolchain error
 Run:
 ```bash
