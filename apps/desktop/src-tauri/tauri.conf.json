@@ -5,7 +5,6 @@
   "identifier": "com.robin.lan-input-sync",
   "build": {
     "beforeDevCommand": "npm run dev --prefix ..",
-    "beforeBuildCommand": "npm run build --prefix ..",
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5173"
   },
@@ -22,8 +21,10 @@
     }
   },
   "bundle": {
-    "active": false,
+    "active": true,
     "targets": "all",
-    "icon": []
+    "icon": [
+      "icons/icon.ico"
+    ]
   }
 }

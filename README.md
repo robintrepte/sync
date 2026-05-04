@@ -49,7 +49,7 @@ For production-grade behavior, continue hardening low-level global input capture
 - Rust stable toolchain (`rustup`, `cargo`, `rustc`)
 - Tauri OS prerequisites
 
-### Install & Build
+### Install & Build (web assets only)
 
 ```bash
 npm install
@@ -63,13 +63,25 @@ cd apps/desktop/src-tauri
 cargo check
 ```
 
-## Run Locally
+### Installable app for end users (Windows `.msi` / NSIS, macOS `.dmg`)
+
+Build installers from the repo root:
+
+```bash
+npm install
+npm run tauri:build
+```
+
+Artifacts are written under `apps/desktop/src-tauri/target/release/bundle/`.  
+See [`docs/distribution.md`](docs/distribution.md) for platform notes, icons, and signing.
+
+## Run Locally (developers)
 
 ```bash
 npm run dev -w apps/desktop
 ```
 
-For full desktop runtime:
+For full desktop runtime with hot reload:
 
 ```bash
 cd apps/desktop
@@ -90,6 +102,7 @@ npm run tauri:dev
 - `docs/setup.md`
 - `docs/validation-matrix.md`
 - `docs/troubleshooting.md`
+- `docs/distribution.md`
 
 ## GitHub
 
