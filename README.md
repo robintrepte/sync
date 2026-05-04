@@ -17,7 +17,7 @@
 
 ## Why This Project
 
-`LAN Input Sync` is a Synergy-like desktop app that lets you control multiple nearby computers as if they were one setup:
+`LAN Input Sync` is a desktop app for sharing one keyboard and mouse across multiple nearby computers, as if they were one setup:
 
 - one keyboard and mouse across machines
 - text clipboard synchronization
