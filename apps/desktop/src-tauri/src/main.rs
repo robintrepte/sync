@@ -1,6 +1,8 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod clipboard_sync;
 mod core {
+    pub mod discovery;
     pub mod network;
     pub mod protocol;
     pub mod session;
@@ -12,8 +14,11 @@ mod platform {
 
 use std::{collections::HashMap, sync::Arc};
 
+use clipboard_sync::ClipboardSyncState;
 use core::{
+    discovery::{Discovery, NearbyPeer},
     network::{NetworkRuntime, NetworkStatus},
+    protocol::WireMessage,
     session::{PeerTrustRecord, SessionManager},
 };
 use serde::{Deserialize, Serialize};
@@ -21,13 +26,11 @@ use tauri::State;
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
-#[derive(Default)]
 struct RuntimeState {
     session: Arc<SessionManager>,
     network: Arc<NetworkRuntime>,
-    last_clipboard_revision: Arc<RwLock<u64>>,
-    last_clipboard_source: Arc<RwLock<Option<Uuid>>>,
-    last_clipboard_hash: Arc<RwLock<Option<u64>>>,
+    clipboard: Arc<ClipboardSyncState>,
+    discovery: Arc<Discovery>,
     active_target_peer: Arc<RwLock<Option<Uuid>>>,
     last_heartbeat_ms: Arc<RwLock<u64>>,
     edge_layout_map: Arc<RwLock<HashMap<String, Uuid>>>,
@@ -104,25 +107,14 @@ async fn trusted_peers(state: State<'_, RuntimeState>) -> Result<Vec<PeerTrustRe
 async fn relay_clipboard_text(
     state: State<'_, RuntimeState>,
     req: ClipboardSyncRequest,
-) -> Result<u64, String> {
-    let text_hash = fxhash(&req.text);
-    let mut last_hash_guard = state.last_clipboard_hash.write().await;
-    let mut last_source_guard = state.last_clipboard_source.write().await;
-
-    // Loop prevention: ignore repeated payloads from the same source peer.
-    if last_source_guard.as_ref() == Some(&req.source_peer) && last_hash_guard.as_ref() == Some(&text_hash) {
-        return Ok(*state.last_clipboard_revision.read().await);
-    }
-
-    let mut revision = state.last_clipboard_revision.write().await;
-    *revision += 1;
-    *last_source_guard = Some(req.source_peer);
-    *last_hash_guard = Some(text_hash);
-
-    platform::windows::set_clipboard_text(&req.text).ok();
-    platform::macos::set_clipboard_text(&req.text).ok();
-
-    Ok(*revision)
+) -> Result<(), String> {
+    state.clipboard.note_local_manual_set(&req.text).await;
+    #[cfg(target_os = "windows")]
+    platform::windows::set_clipboard_text(&req.text).map_err(|e| e.to_string())?;
+    #[cfg(target_os = "macos")]
+    platform::macos::set_clipboard_text(&req.text).map_err(|e| e.to_string())?;
+    let _ = req.source_peer;
+    Ok(())
 }
 
 #[tauri::command]
@@ -211,10 +203,54 @@ async fn start_host_listener(
 ) -> Result<NetworkStatus, String> {
     state
         .network
-        .start_host(state.session.clone(), bind_addr)
+        .start_host(
+            state.session.clone(),
+            state.clipboard.clone(),
+            bind_addr,
+        )
         .await
         .map_err(|e| e.to_string())?;
     Ok(state.network.status().await)
+}
+
+#[derive(Serialize)]
+struct SharingStarted {
+    pairing_code: String,
+    status: NetworkStatus,
+}
+
+#[tauri::command]
+fn local_device_name() -> String {
+    whoami::fallible::hostname()
+        .ok()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| "This computer".to_string())
+}
+
+#[tauri::command]
+async fn start_sharing(state: State<'_, RuntimeState>) -> Result<SharingStarted, String> {
+    let pairing_code = state.session.new_pairing_code().await;
+    let friendly = local_device_name();
+    state.discovery.register(&friendly, 24800).map_err(|e| e.to_string())?;
+    state
+        .network
+        .start_host(
+            state.session.clone(),
+            state.clipboard.clone(),
+            "0.0.0.0:24800".to_string(),
+        )
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(SharingStarted {
+        pairing_code,
+        status: state.network.status().await,
+    })
+}
+
+#[tauri::command]
+async fn nearby_peers(state: State<'_, RuntimeState>) -> Result<Vec<NearbyPeer>, String> {
+    Ok(state.discovery.list_peers())
 }
 
 #[tauri::command]
@@ -226,7 +262,13 @@ async fn connect_to_host(
 ) -> Result<NetworkStatus, String> {
     state
         .network
-        .connect_to_host(state.session.clone(), host_addr, pairing_code, device_name)
+        .connect_to_host(
+            state.session.clone(),
+            state.clipboard.clone(),
+            host_addr,
+            pairing_code,
+            device_name,
+        )
         .await
         .map_err(|e| e.to_string())?;
     Ok(state.network.status().await)
@@ -274,11 +316,17 @@ fn now_ms() -> u64 {
         .as_millis() as u64
 }
 
-fn fxhash(input: &str) -> u64 {
-    use std::hash::{Hash, Hasher};
-    let mut hasher = std::collections::hash_map::DefaultHasher::new();
-    input.hash(&mut hasher);
-    hasher.finish()
+fn get_local_clipboard_text() -> Option<String> {
+    #[cfg(target_os = "windows")]
+    {
+        return platform::windows::get_clipboard_text().ok().flatten();
+    }
+    #[cfg(target_os = "macos")]
+    {
+        return platform::macos::get_clipboard_text().ok().flatten();
+    }
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    None
 }
 
 #[tokio::main]
@@ -287,15 +335,54 @@ async fn main() {
         .await
         .expect("failed to initialize session manager");
 
+    let discovery = Arc::new(Discovery::new().expect("mdns discovery"));
+    if let Err(e) = discovery.start_browser() {
+        eprintln!("mdns: could not browse for nearby devices: {e}");
+    }
+    let session = Arc::new(session);
+    let network = Arc::new(NetworkRuntime::new());
+    let clipboard = Arc::new(ClipboardSyncState::new());
+
+    let poll_session = session.clone();
+    let poll_network = network.clone();
+    let poll_clipboard = clipboard.clone();
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(std::time::Duration::from_millis(420));
+        loop {
+            interval.tick().await;
+            if !poll_network.has_outbound().await {
+                continue;
+            }
+            let text: Option<String> = tokio::task::spawn_blocking(|| get_local_clipboard_text())
+                .await
+                .ok()
+                .flatten();
+            let Some(text) = text else {
+                continue;
+            };
+            let id = poll_session.device_id().await;
+            if let Some((_r, upd)) = poll_clipboard.prepare_outgoing(id, &text).await {
+                let _ = poll_network
+                    .send_wire(WireMessage::ClipboardTextUpdate(upd))
+                    .await;
+            }
+        }
+    });
+
     let state = RuntimeState {
-        session: Arc::new(session),
-        network: Arc::new(NetworkRuntime::new()),
-        ..Default::default()
+        session,
+        network,
+        clipboard,
+        discovery,
+        active_target_peer: Arc::new(RwLock::new(None)),
+        last_heartbeat_ms: Arc::new(RwLock::new(0)),
+        edge_layout_map: Arc::new(RwLock::new(HashMap::new())),
     };
 
     tauri::Builder::default()
         .manage(state)
         .invoke_handler(tauri::generate_handler![
+            local_device_name,
             generate_pairing_code,
             submit_pairing,
             trusted_peers,
@@ -306,6 +393,8 @@ async fn main() {
             health_check,
             heartbeat,
             start_host_listener,
+            start_sharing,
+            nearby_peers,
             connect_to_host,
             network_status,
             start_input_capture,

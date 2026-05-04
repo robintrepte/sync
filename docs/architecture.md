@@ -1,4 +1,4 @@
-# LAN Input Sync Architecture
+# Sync Architecture
 
 ## Runtime components
 - Tauri app shell with a React UI.

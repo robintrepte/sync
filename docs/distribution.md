@@ -51,7 +51,7 @@ This repo includes **`.github/workflows/release.yml`**.
    git push origin v0.1.1
    ```
 
-3. GitHub Actions builds **`npm run tauri:build`** on Windows and **uploads the MSI and NSIS installer** to a Release for that tag.
+3. GitHub Actions builds **`npm run tauri:build`** on **Windows** (MSI + NSIS) and **macOS** (DMG) and **uploads those installers** to the Release for that tag.
 
 You can also run the workflow manually (**Actions → Release → Run workflow**) and download **workflow artifacts** from the run summary (same installers, not attached to a Release unless you used a tag).
 

@@ -19,6 +19,21 @@ export type NetworkStatus = {
   last_error?: string;
 };
 
+export type NearbyPeer = {
+  id: string;
+  name: string;
+  address: string;
+};
+
+export type SharingStarted = {
+  pairing_code: string;
+  status: NetworkStatus;
+};
+
+export async function localDeviceName(): Promise<string> {
+  return invoke("local_device_name");
+}
+
 export async function generatePairingCode(): Promise<string> {
   return invoke("generate_pairing_code");
 }
@@ -39,10 +54,18 @@ export async function trustedPeers(): Promise<TrustedPeer[]> {
   return invoke("trusted_peers");
 }
 
+export async function startSharing(): Promise<SharingStarted> {
+  return invoke("start_sharing");
+}
+
+export async function nearbyPeers(): Promise<NearbyPeer[]> {
+  return invoke("nearby_peers");
+}
+
 export async function relayClipboardText(payload: {
   text: string;
   sourcePeer: string;
-}): Promise<number> {
+}): Promise<void> {
   return invoke("relay_clipboard_text", {
     req: {
       text: payload.text,

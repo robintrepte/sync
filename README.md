@@ -1,7 +1,7 @@
-# LAN Input Sync
+# Sync
 
 <p align="center">
-  <img src="./assets/hero.jpg" alt="LAN Input Sync hero image" width="100%" />
+  <img src="./assets/hero.jpg" alt="Sync hero image" width="100%" />
 </p>
 
 <p align="center">
@@ -17,7 +17,7 @@
 
 ## Why This Project
 
-`LAN Input Sync` is a desktop app for sharing one keyboard and mouse across multiple nearby computers, as if they were one setup:
+`Sync` is a desktop app for sharing one keyboard and mouse across multiple nearby computers, as if they were one setup:
 
 - one keyboard and mouse across machines
 - text clipboard synchronization

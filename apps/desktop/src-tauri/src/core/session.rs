@@ -43,17 +43,33 @@ pub struct TrustStoreFile {
     pub peers: Vec<PeerTrustRecord>,
 }
 
-#[derive(Default, Clone)]
+#[derive(Clone)]
 pub struct SessionManager {
     pub pairing_state: Arc<RwLock<PairingState>>,
     pub trust_map: Arc<RwLock<HashMap<Uuid, PeerTrustRecord>>>,
     pub identity: Arc<RwLock<LocalIdentity>>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+impl Default for SessionManager {
+    fn default() -> Self {
+        Self {
+            pairing_state: Arc::new(RwLock::new(PairingState::default())),
+            trust_map: Arc::new(RwLock::new(HashMap::new())),
+            identity: Arc::new(RwLock::new(LocalIdentity {
+                cert_der_base64: String::new(),
+                key_der_base64: String::new(),
+                device_id: None,
+            })),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LocalIdentity {
     pub cert_der_base64: String,
     pub key_der_base64: String,
+    #[serde(default)]
+    pub device_id: Option<Uuid>,
 }
 
 impl Default for PairingState {
@@ -214,23 +230,29 @@ impl SessionManager {
     fn load_or_create_local_identity(&self) -> Result<LocalIdentity> {
         let path = identity_path()?;
         if path.exists() {
-            let contents = fs::read_to_string(path)?;
-            let identity = serde_json::from_str::<LocalIdentity>(&contents)?;
+            let contents = fs::read_to_string(&path)?;
+            let mut identity = serde_json::from_str::<LocalIdentity>(&contents)?;
+            if identity.device_id.is_none() {
+                identity.device_id = Some(Uuid::new_v4());
+                fs::write(path, serde_json::to_string_pretty(&identity)?)?;
+            }
             return Ok(identity);
         }
 
         let key_pair = KeyPair::generate()?;
         let mut params = CertificateParams::new(vec![
+            "sync.local".to_string(),
             "lan-input-sync.local".to_string(),
             "localhost".to_string(),
         ])?;
         let mut dn = DistinguishedName::new();
-        dn.push(DnType::CommonName, "lan-input-sync");
+        dn.push(DnType::CommonName, "sync");
         params.distinguished_name = dn;
         let cert = params.self_signed(&key_pair)?;
         let identity = LocalIdentity {
             cert_der_base64: STANDARD.encode(cert.der()),
             key_der_base64: STANDARD.encode(key_pair.serialize_der()),
+            device_id: Some(Uuid::new_v4()),
         };
 
         if let Some(parent) = path.parent() {
@@ -238,6 +260,20 @@ impl SessionManager {
         }
         fs::write(path, serde_json::to_string_pretty(&identity)?)?;
         Ok(identity)
+    }
+
+    pub async fn device_id(&self) -> Uuid {
+        let mut guard = self.identity.write().await;
+        if guard.device_id.is_none() {
+            guard.device_id = Some(Uuid::new_v4());
+            if let Ok(path) = identity_path() {
+                let _ = fs::write(
+                    path,
+                    serde_json::to_string_pretty(&*guard).unwrap_or_default(),
+                );
+            }
+        }
+        guard.device_id.unwrap_or_else(Uuid::nil)
     }
 }
 
@@ -248,13 +284,13 @@ pub fn fingerprint_for_certificate(bytes: &[u8]) -> String {
 }
 
 fn trust_store_path() -> Result<PathBuf> {
-    let proj = ProjectDirs::from("com", "robin", "lan-input-sync")
+    let proj = ProjectDirs::from("com", "robin", "sync")
         .context("unable to determine config directory")?;
     Ok(proj.config_dir().join("trusted-peers.json"))
 }
 
 fn identity_path() -> Result<PathBuf> {
-    let proj = ProjectDirs::from("com", "robin", "lan-input-sync")
+    let proj = ProjectDirs::from("com", "robin", "sync")
         .context("unable to determine config directory")?;
     Ok(proj.config_dir().join("local-identity.json"))
 }

@@ -1,11 +1,15 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Lan Input Sync",
+  "productName": "Sync",
   "version": "0.1.0",
-  "identifier": "com.robin.lan-input-sync",
+  "identifier": "com.robin.sync",
   "build": {
     "beforeDevCommand": {
       "script": "npm run dev",
+      "cwd": ".."
+    },
+    "beforeBuildCommand": {
+      "script": "npm run build",
       "cwd": ".."
     },
     "frontendDist": "../dist",
@@ -14,7 +18,7 @@
   "app": {
     "windows": [
       {
-        "title": "Lan Input Sync",
+        "title": "Sync",
         "width": 980,
         "height": 760
       }

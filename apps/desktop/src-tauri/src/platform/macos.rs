@@ -52,3 +52,12 @@ pub fn set_clipboard_text(text: &str) -> Result<()> {
     clipboard.set_text(text.to_string())?;
     Ok(())
 }
+
+pub fn get_clipboard_text() -> Result<Option<String>> {
+    let mut clipboard = Clipboard::new()?;
+    match clipboard.get_text() {
+        Ok(t) if !t.is_empty() => Ok(Some(t)),
+        Ok(_) => Ok(None),
+        Err(_) => Ok(None),
+    }
+}

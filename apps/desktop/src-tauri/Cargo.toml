@@ -1,5 +1,5 @@
 [package]
-name = "lan_input_sync"
+name = "sync"
 version = "0.1.0"
 edition = "2021"
 
@@ -25,6 +25,8 @@ directories = "5.0.1"
 mdns-sd = "0.11.3"
 arboard = "3.4.0"
 rdev = "0.5.3"
+whoami = "1.5"
+if-addrs = "0.13"
 
 [features]
 default = ["custom-protocol"]
