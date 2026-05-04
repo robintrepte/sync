@@ -108,7 +108,10 @@ npm run tauri:dev
 
 Repository: [github.com/robintrepte/sync](https://github.com/robintrepte/sync)
 
-CI runs on `main` via [`.github/workflows/ci.yml`](.github/workflows/ci.yml). Enable **Actions** in the repo settings if the workflow is disabled.
+- **CI** on `main`: [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
+- **Releases**: Windows **MSI + NSIS** installers are built in [`.github/workflows/release.yml`](.github/workflows/release.yml) when you push a tag like `v0.1.0` (see [`docs/distribution.md`](docs/distribution.md)). They are not stored in git on purpose.
+
+Enable **Actions** in the repo settings if workflows are disabled.
 
 ## License
 

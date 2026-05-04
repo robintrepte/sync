@@ -35,6 +35,31 @@ Outputs appear under:
 - **Windows**: look under `msi/` and `nsis/` (exact names depend on Tauri defaults).
 - **macOS**: look under `dmg/` (and/or `macos/`) when you build **on a Mac**.
 
+## Why installers are not committed to Git
+
+Built `.msi` / `.exe` files are **large binaries**. Git tracks source; **GitHub Releases** are meant for downloadable artifacts. That keeps clones fast and avoids bloating history.
+
+## Publish a GitHub Release (automated)
+
+This repo includes **`.github/workflows/release.yml`**.
+
+1. Bump `version` in `apps/desktop/src-tauri/tauri.conf.json` and `apps/desktop/package.json` / root `package.json` if you version them together (optional but clearer).
+2. Create and push a **SemVer tag**:
+
+   ```bash
+   git tag v0.1.1
+   git push origin v0.1.1
+   ```
+
+3. GitHub Actions builds **`npm run tauri:build`** on Windows and **uploads the MSI and NSIS installer** to a Release for that tag.
+
+You can also run the workflow manually (**Actions → Release → Run workflow**) and download **workflow artifacts** from the run summary (same installers, not attached to a Release unless you used a tag).
+
+## Publish manually (upload ZIP yourself)
+
+1. Run `npm run tauri:build` locally.
+2. On GitHub: **Releases → Draft a new release → choose tag → attach** the files from `bundle/msi/` and `bundle/nsis/`.
+
 ## Best practice (short)
 
 1. **Prefer an installer** (MSI/NSIS on Windows, DMG on macOS) over “here is a loose `.exe`” so shortcuts and uninstall entries exist.
