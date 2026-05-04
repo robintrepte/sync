@@ -1,0 +1,12 @@
+{
+  "name": "lan-input-sync",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/desktop"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w apps/desktop",
+    "build": "npm run build -w apps/desktop"
+  }
+}
